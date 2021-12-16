@@ -1,0 +1,557 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+```{r}
+
+library(tidyverse)
+library(haven)
+
+```
+
+
+# Methods ----------
+
+
+## Read and clean data:
+
+
+```{r}
+
+pilot <- read_sav("../data-raw/Tightness for different kinds of norms_US_pilot.sav")
+  
+us_data <- read_sav("../data-raw/Tightness for different kinds of norms_US.sav")
+
+swe_data <- read_sav("../data-raw/Tightness for different kinds of norms_Sweden.sav")
+
+```
+
+```{r}
+
+# Clean pilot:
+pilot <- pilot %>% 
+  mutate(gender = as_factor(gender)) %>% 
+  # Reverse code "freedom" item:
+  mutate(freedom = as.numeric(freedom),
+    freedom = case_when(
+    freedom == 1 ~ 6,
+    freedom == 2 ~ 5,
+    freedom == 3 ~ 4,
+    freedom == 4 ~ 3,
+    freedom == 5 ~ 2,
+    freedom == 6 ~ 1,
+    TRUE ~ freedom))
+
+# Clean US data:
+us_data <- us_data %>%
+  mutate(gender = as_factor(gender)) %>% 
+  rename_all(~tolower(.)) %>% 
+  # Remove survey previews:
+  filter(status == 0) %>% 
+  # Remove participants who did not provide answers to Gelfand et al.'s items:
+  filter(progress != 6) %>% 
+  # Reverse code "freedom" item:
+  mutate(freedom = as.numeric(freedom),
+    freedom = case_when(
+    freedom == 1 ~ 6,
+    freedom == 2 ~ 5,
+    freedom == 3 ~ 4,
+    freedom == 4 ~ 3,
+    freedom == 5 ~ 2,
+    freedom == 6 ~ 1,
+    TRUE ~ freedom))
+
+# Clean Swedish data:
+swe_data <- swe_data %>%
+  mutate(gender = as_factor(gender)) %>% 
+  rename_all(~tolower(.)) %>% 
+  # Remove survey previews:
+  filter(status == 0) %>% 
+  # Reverse code "freedom" item:
+  mutate(freedom = as.numeric(freedom),
+    freedom = case_when(
+    freedom == 1 ~ 6,
+    freedom == 2 ~ 5,
+    freedom == 3 ~ 4,
+    freedom == 4 ~ 3,
+    freedom == 5 ~ 2,
+    freedom == 6 ~ 1,
+    TRUE ~ freedom))
+
+```
+
+
+# Results ----------
+
+## Domain-general tightness:
+
+### Perceived tightness and descriptive statistics:
+```{r}
+
+# Pilot:
+
+pilot <- pilot %>% 
+  mutate(ind_perc_tight = rowMeans(select(., abide:compliance)))
+
+# Country tightness:
+round(mean(pilot$ind_perc_tight), 2)
+
+# Confidence intervals:
+pilot %>%
+  rename_all(~tolower(.)) %>% 
+  summarise(mean_tight = mean(ind_perc_tight),
+            sd_tight = sd(ind_perc_tight),
+            n = n_distinct(responseid),
+            se_tight = sd_tight / sqrt(n),
+            upper_ci = mean_tight + (2*se_tight),
+            lower_ci = mean_tight - (2*se_tight)) %>% 
+  mutate_all(~round(., 2))
+
+# % of females:
+pilot %>% 
+  group_by(gender) %>% 
+  summarise(n_resp = n_distinct(ResponseId),
+            prop = n_resp / 50)
+
+# Mean age:
+mean(pilot$age)
+
+```
+```{r}
+
+# US:
+
+us <- us_data %>% 
+  mutate(ind_perc_tight = rowMeans(select(., abide:compliance)))
+
+# Country tightness:
+round(mean(us$ind_perc_tight), 2)
+
+# Confidence intervals:
+us_ci <- us %>%
+  rename_all(~tolower(.)) %>% 
+  summarise(mean_tight = mean(ind_perc_tight),
+            sd_tight = sd(ind_perc_tight),
+            n = n_distinct(responseid),
+            se_tight = sd_tight / sqrt(n),
+            upper_ci = mean_tight + (2*se_tight),
+            lower_ci = mean_tight - (2*se_tight)) %>% 
+  mutate_all(~round(., 2))
+
+# % of females:
+us %>% 
+  drop_na(gender) %>% 
+  group_by(gender) %>% 
+  summarise(n_resp = n_distinct(responseid),
+            prop = n_resp / (45+153+2))
+
+# Mean age:
+us %>% 
+  drop_na(age) %>% 
+  summarise(mean(age))
+
+```
+```{r}
+
+# Sweden:
+
+swe <- swe_data %>% 
+  mutate(ind_perc_tight = rowMeans(select(., abide:compliance)))
+
+# Country tightness:
+round(mean(swe$ind_perc_tight), 2)
+
+# Confidence intervals:
+swe_ci <- swe %>%
+  rename_all(~tolower(.)) %>% 
+  summarise(mean_tight = mean(ind_perc_tight),
+            sd_tight = sd(ind_perc_tight),
+            n = n_distinct(responseid),
+            se_tight = sd_tight / sqrt(n),
+            upper_ci = mean_tight + (2*se_tight),
+            lower_ci = mean_tight - (2*se_tight)) %>% 
+  mutate_all(~round(., 2))
+
+# % of females:
+swe %>% 
+  drop_na(gender) %>% 
+  group_by(gender) %>% 
+  summarise(n_resp = n_distinct(responseid),
+            prop = round(n_resp / (109+60+5), 2))
+
+# Mean age:
+swe %>% 
+  drop_na(age) %>% 
+  summarise(mean(age))
+
+```
+
+Diference between us and swe:
+```{r}
+
+swe_ci$mean_tight - us_ci$mean_tight
+
+# Confidence intervals of such difference:
+# m1 - m2 +- z * sqrt((sd1^2)/n1 + (sd2^2)/n2)
+
+m_swe <- swe_ci$mean_tight
+m_us <- us_ci$mean_tight
+sd_swe <- swe_ci$sd_tight
+sd_us <- us_ci$sd_tight
+n_swe <- swe_ci$n
+n_us <- us_ci$n
+
+round((m_swe - m_us) + 1.96 * sqrt((sd_swe^2)/n_swe + (sd_us^2)/n_us), 2)
+round((m_swe - m_us) - 1.96 * sqrt((sd_swe^2)/n_swe + (sd_us^2)/n_us), 2)
+
+```
+
+### Supplementary analyses of country differences - adjusted by gender:
+```{r}
+
+pooled_data <- bind_rows(us %>% 
+                           mutate(country = "USA") %>% 
+                           filter(gender %in% c("Male", "Female")), 
+                         swe %>% 
+                           mutate(country = "Sweden") %>% 
+                           filter(gender %in% c("Male", "Female"))) 
+
+model <- lm(ind_perc_tight ~ gender + country, data = pooled_data) 
+
+# Estimate marginal means:
+emm <- emmeans::emmeans(model, ~ country) %>% 
+  as.data.frame() %>% 
+  mutate_at(vars(emmean:`upper.CL`), ~round(., 2))
+
+```
+```{r}
+
+# Diference between us and swe:
+emm$emmean[1] - emm$emmean[2]
+
+# Confidence intervals of such difference:
+# m1 - m2 +- z * sqrt((sd1^2)/n1 + (sd2^2)/n2)
+
+m_swe <- emm$emmean[1]
+m_us <- emm$emmean[2]
+sd_swe <- swe_ci$sd_tight
+sd_us <- us_ci$sd_tight
+n_swe <- swe_ci$n
+n_us <- us_ci$n
+
+round((m_swe - m_us) + 1.96 * sqrt((sd_swe^2)/n_swe + (sd_us^2)/n_us), 2)
+round((m_swe - m_us) - 1.96 * sqrt((sd_swe^2)/n_swe + (sd_us^2)/n_us), 2)
+
+```
+
+
+Domains of norms that come to mind:
+
+In the main study, participants were presented with a list of norm domains and asked to tick off any that they had been thinking of. The percentages of participants that ticked each domain is shown in the figure below:
+```{r}
+
+level_order <- c("other", "whom you may love", "raise one’s children", "behavior depending on sex", "being helpful and cooperative", "how people may dress", "coughing, spitting and sneezing", "talk about other groups", "considerate behavior in public")
+
+pooled_data <- bind_rows(us_data %>% 
+                           mutate(country = "USA"), 
+                         swe_data %>% 
+                           mutate(country = "Sweden")) 
+
+pooled_data %>%
+  # Rename 
+  rename(`how people may dress` = examples_4, `talk about other groups` = examples_5,
+         `coughing, spitting and sneezing` = examples_6, `considerate behavior in public` = examples_7,
+         `being helpful and cooperative` = examples_8, `raise one’s children` = examples_9,
+         `whom you may love` = examples_10, `behavior depending on sex` = examples_11, 
+         other = examples_12, comments = examples_12_text) %>% 
+  select(responseid, country, `how people may dress`:other) %>%
+  pivot_longer(cols = c(`how people may dress`:other),
+               names_to = "norm_domain",
+               values_to = "in_mind") %>% 
+  mutate(in_mind = ifelse(is.na(in_mind) == TRUE, 0, in_mind)) %>%
+  group_by(country, norm_domain) %>% 
+  summarise(prop_in_mind = mean(in_mind)*100,
+            sd_in_mind = sd(in_mind),
+            n = n_distinct(responseid),
+            se_in_mind = (sd_in_mind / sqrt(n))*100) %>%
+  mutate(country = factor(country, level = c("USA", "Sweden")),
+         norm_domain = factor(norm_domain, level = level_order)) %>% 
+  ggplot(aes(x = norm_domain, y = prop_in_mind, fill = country)) +
+  geom_bar(stat = "identity", color = "black", position = "dodge") +
+  geom_errorbar(aes(ymin = prop_in_mind - 2*se_in_mind, ymax = prop_in_mind + 2*se_in_mind), 
+                width = .2, 
+                position = position_dodge(width = 0.9)) +
+  scale_y_continuous(limits = c(0, 100)) +
+  # theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1)) +
+  coord_flip() +
+  labs(x = "Norm domain", y = "%") +
+  ggtitle("Frequencies with which different norm domains\ncame to mind to Americans and Swedes") 
+
+ggsave("../figures/freq-with-which-norm-domains-come-to-mind.jpeg", dpi = 350)
+  
+```
+
+
+## Domain-specific tightness:
+
+In the main study we measured domain-specific tightness in the United States and Sweden in six different domains:
+```{r}
+
+pooled_data <- bind_rows(us_data %>% 
+                           mutate(country = "USA"), 
+                         swe_data %>% 
+                           mutate(country = "Sweden")) 
+
+
+vector_to_name <- names(pooled_data %>% select(responseid, country, gender, expectations2_1:disapproval2_6))
+vector_of_names <- c("responseid", "country", "gender",
+                     
+                     "expectations_dress", "expectations_talk",
+                     "expectations_cough", "expectations_consideration", 
+                     "expectations_helpful", "expectations_children",
+                     
+                     "appropriateness_dress", "appropriateness_talk",
+                     "appropriateness_cough", "appropriateness_consideration", 
+                     "appropriateness_helpful", "appropriateness_children",
+                     
+                     "freedom_dress", "freedom_talk",
+                     "freedom_cough", "freedom_consideration", 
+                     "freedom_helpful", "freedom_children",
+                     
+                     "disapproval_dress", "disapproval_talk",
+                     "disapproval_cough", "disapproval_consideration", 
+                     "disapproval_helpful", "disapproval_children")
+
+
+pooled_data_clean <- pooled_data %>%
+  select(responseid, country, gender, expectations2_1:disapproval2_6) %>% 
+  rename_all(~str_replace_all(., vector_to_name, vector_of_names)) %>% 
+  pivot_longer(cols = c(expectations_dress:disapproval_children),
+               names_to = "vars",
+               values_to = "values") %>% 
+  separate(vars, into = c("gelfand_item", "norm_domain"), sep = "_") %>%
+  # Reverse code "freedom" item:
+  mutate(values = as.numeric(values),
+    values = case_when(
+    gelfand_item == "freedom" & values == 1 ~ 6,
+    gelfand_item == "freedom" & values == 2 ~ 5,
+    gelfand_item == "freedom" & values == 3 ~ 4,
+    gelfand_item == "freedom" & values == 4 ~ 3,
+    gelfand_item == "freedom" & values == 5 ~ 2,
+    gelfand_item == "freedom" & values == 6 ~ 1, 
+    TRUE ~ values)) %>%
+  drop_na(values) %>% 
+  group_by(country, norm_domain) %>%
+  summarise(tight  = mean(values),
+            sd_tight = sd(values),
+            n = n_distinct(responseid),
+            se_tight = (sd_tight / sqrt(n)))
+
+
+level_order <- c("how people may dress", "being helpful and cooperative", "raise one’s children", "considerate behavior in public", "talk about other groups", "coughing, spitting and sneezing")
+
+
+pooled_data_clean %>% 
+ mutate(country = factor(country, level = c("USA", "Sweden")),
+         norm_domain = case_when(
+           norm_domain == "children" ~ "raise one’s children",
+           norm_domain == "helpful" ~ "being helpful and cooperative",
+           norm_domain == "dress" ~ "how people may dress",
+           norm_domain == "cough" ~ "coughing, spitting and sneezing",
+           norm_domain == "talk" ~ "talk about other groups",
+           norm_domain == "consideration" ~ "considerate behavior in public"),
+        norm_domain = factor(norm_domain, level = level_order)) %>% 
+  ggplot(aes(x = norm_domain, y = tight, fill = country)) +
+  geom_bar(stat = "identity", color = "black", position = "dodge") +
+  geom_errorbar(aes(ymin = tight - 2*se_tight, ymax = tight + 2*se_tight), 
+                width = .2, 
+                position = position_dodge(width = 0.9)) +
+  scale_y_continuous(limits = c(0, 6)) +
+  # theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1)) +
+  coord_flip() +
+  labs(x = "Norm domain", y = "Perceived tightness") +
+  ggtitle("Domain-specific tightness") 
+
+ggsave("../figures/domain-specific-tightness.jpeg", dpi = 350)
+
+```
+
+Difference between us and swe: talk about other groups
+```{r}
+
+talk_us <- pooled_data_clean %>% 
+  filter(country == "USA" & norm_domain == "talk")
+
+talk_swe <- pooled_data_clean %>% 
+  filter(country == "Sweden" & norm_domain == "talk")
+
+round(talk_swe$tight - talk_us$tight, 2)
+
+# Confidence intervals of such difference:
+# m1 - m2 +- z * sqrt((sd1^2)/n1 + (sd2^2)/n2)
+
+m_us <- talk_us$tight
+m_swe <- talk_swe$tight
+sd_us <- talk_us$sd_tight
+sd_swe <- talk_swe$sd_tight
+n_us <- talk_us$n
+n_swe <- talk_swe$n
+
+round((m_swe - m_us) + 1.96 * sqrt((sd_swe^2)/n_swe + (sd_us^2)/n_us), 2)
+round((m_swe - m_us) - 1.96 * sqrt((sd_swe^2)/n_swe + (sd_us^2)/n_us), 2)
+
+```
+Difference between us and swe: considerate behavior in public
+```{r}
+
+behavior_us <- pooled_data_clean %>% 
+  filter(country == "USA" & norm_domain == "consideration")
+
+behavior_swe <- pooled_data_clean %>% 
+  filter(country == "Sweden" & norm_domain == "consideration")
+
+round(behavior_swe$tight - behavior_us$tight, 2)
+
+# Confidence intervals of such difference:
+# m1 - m2 +- z * sqrt((sd1^2)/n1 + (sd2^2)/n2)
+
+m_us <- behavior_us$tight
+m_swe <- behavior_swe$tight
+sd_us <- behavior_us$sd_tight
+sd_swe <- behavior_swe$sd_tight
+n_us <- behavior_us$n
+n_swe <- behavior_swe$n
+
+round((m_swe - m_us) + 1.96 * sqrt((sd_swe^2)/n_swe + (sd_us^2)/n_us), 2)
+round((m_swe - m_us) - 1.96 * sqrt((sd_swe^2)/n_swe + (sd_us^2)/n_us), 2)
+
+```
+
+### Supplementary analyses of country differences - adjusted by gender:
+
+```{r}
+
+pooled_data_clean <- pooled_data %>%
+  select(responseid, country, gender, expectations2_1:disapproval2_6) %>% 
+  rename_all(~str_replace_all(., vector_to_name, vector_of_names)) %>% 
+  pivot_longer(cols = c(expectations_dress:disapproval_children),
+               names_to = "vars",
+               values_to = "values") %>% 
+  separate(vars, into = c("gelfand_item", "norm_domain"), sep = "_") %>%
+  # Reverse code "freedom" item:
+  mutate(values = as.numeric(values),
+    values = case_when(
+    gelfand_item == "freedom" & values == 1 ~ 6,
+    gelfand_item == "freedom" & values == 2 ~ 5,
+    gelfand_item == "freedom" & values == 3 ~ 4,
+    gelfand_item == "freedom" & values == 4 ~ 3,
+    gelfand_item == "freedom" & values == 5 ~ 2,
+    gelfand_item == "freedom" & values == 6 ~ 1, 
+    TRUE ~ values)) %>%
+  drop_na(values) %>% 
+  # Filter relevant gender options:
+  filter(gender %in% c("Male", "Female"))
+
+```
+
+Difference between us and swe: talk about other groups
+```{r}
+
+talk_data <- pooled_data_clean %>% 
+  filter(norm_domain == "talk")
+
+
+talk_model <- lm(values ~ gender + country, data = talk_data) 
+
+# Estimate marginal means:
+(talk_emm <- emmeans::emmeans(talk_model, ~ country) %>% 
+  as.data.frame() %>% 
+  mutate_at(vars(emmean:`upper.CL`), ~round(., 2)))
+
+```
+```{r}
+
+# Diference between us and swe:
+talk_emm$emmean[1] - talk_emm$emmean[2]
+
+# Confidence intervals of such difference:
+# m1 - m2 +- z * sqrt((sd1^2)/n1 + (sd2^2)/n2)
+
+talk_data_aggr <- talk_data %>%   
+  group_by(country) %>%
+  summarise(tight  = mean(values),
+            sd_tight = sd(values),
+            n = n_distinct(responseid),
+            se_tight = (sd_tight / sqrt(n)))
+
+us_talk_data <- talk_data_aggr %>% 
+  filter(country == "USA")
+
+swe_talk_data <- talk_data_aggr %>% 
+  filter(country == "Sweden")
+
+m_swe <- talk_emm$emmean[1]
+m_us <- talk_emm$emmean[2]
+sd_swe <- swe_talk_data$sd_tight
+sd_us <- us_talk_data$sd_tight
+n_swe <- swe_talk_data$n
+n_us <- us_talk_data$n
+
+round((m_swe - m_us) + 1.96 * sqrt((sd_swe^2)/n_swe + (sd_us^2)/n_us), 2)
+round((m_swe - m_us) - 1.96 * sqrt((sd_swe^2)/n_swe + (sd_us^2)/n_us), 2)
+
+```
+
+Difference between us and swe: considerate behavior in public
+```{r}
+
+behavior_data <- pooled_data_clean %>% 
+  filter(norm_domain == "consideration")
+
+
+behavior_model <- lm(values ~ gender + country, data = behavior_data) 
+
+# Estimate marginal means:
+(behavior_emm <- emmeans::emmeans(behavior_model, ~ country) %>% 
+  as.data.frame() %>% 
+  mutate_at(vars(emmean:`upper.CL`), ~round(., 2)))
+
+```
+```{r}
+
+# Diference between us and swe:
+behavior_emm$emmean[1] - behavior_emm$emmean[2]
+
+# Confidence intervals of such difference:
+# m1 - m2 +- z * sqrt((sd1^2)/n1 + (sd2^2)/n2)
+
+behavior_data_aggr <- behavior_data %>%   
+  group_by(country) %>%
+  summarise(tight  = mean(values),
+            sd_tight = sd(values),
+            n = n_distinct(responseid),
+            se_tight = (sd_tight / sqrt(n)))
+
+us_behavior_data <- behavior_data_aggr %>% 
+  filter(country == "USA")
+
+swe_behavior_data <- behavior_data_aggr %>% 
+  filter(country == "Sweden")
+
+m_swe <- behavior_emm$emmean[1]
+m_us <- behavior_emm$emmean[2]
+sd_swe <- swe_behavior_data$sd_tight
+sd_us <- us_behavior_data$sd_tight
+n_swe <- swe_behavior_data$n
+n_us <- us_behavior_data$n
+
+round((m_swe - m_us) + 1.96 * sqrt((sd_swe^2)/n_swe + (sd_us^2)/n_us), 2)
+round((m_swe - m_us) - 1.96 * sqrt((sd_swe^2)/n_swe + (sd_us^2)/n_us), 2)
+
+```
+
+
+
+
+
