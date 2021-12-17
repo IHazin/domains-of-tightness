@@ -283,12 +283,11 @@ pooled_data %>%
                 width = .2, 
                 position = position_dodge(width = 0.9)) +
   scale_y_continuous(limits = c(0, 100)) +
-  # theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1)) +
   coord_flip() +
   labs(x = "Norm domain", y = "%") +
   ggtitle("Frequencies with which different norm domains\ncame to mind to Americans and Swedes") 
 
-ggsave("../figures/freq-with-which-norm-domains-come-to-mind.jpeg", dpi = 350)
+ggsave("../figures/freq-with-which-norm-domains-come-to-mind.tiff", dpi = 350)
   
 ```
 
@@ -349,7 +348,7 @@ pooled_data_clean <- pooled_data %>%
             se_tight = (sd_tight / sqrt(n)))
 
 
-level_order <- c("how people may dress", "being helpful and cooperative", "raise one’s children", "considerate behavior in public", "talk about other groups", "coughing, spitting and sneezing")
+level_order <- c("raise one’s children", "being helpful and cooperative", "how people may dress", "coughing, spitting and sneezing", "talk about other groups", "considerate behavior in public")
 
 
 pooled_data_clean %>% 
@@ -363,17 +362,14 @@ pooled_data_clean %>%
            norm_domain == "consideration" ~ "considerate behavior in public"),
         norm_domain = factor(norm_domain, level = level_order)) %>% 
   ggplot(aes(x = norm_domain, y = tight, fill = country)) +
-  geom_bar(stat = "identity", color = "black", position = "dodge") +
-  geom_errorbar(aes(ymin = tight - 2*se_tight, ymax = tight + 2*se_tight), 
-                width = .2, 
-                position = position_dodge(width = 0.9)) +
-  scale_y_continuous(limits = c(0, 6)) +
-  # theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1)) +
+  geom_pointrange(aes(ymin = tight - 2*se_tight, ymax = tight + 2*se_tight, color = country), 
+                  position = position_dodge(width = .3))+
+  scale_y_continuous(limits = c(1, 6), breaks = 1:6) +
   coord_flip() +
   labs(x = "Norm domain", y = "Perceived tightness") +
   ggtitle("Domain-specific tightness") 
 
-ggsave("../figures/domain-specific-tightness.jpeg", dpi = 350)
+ggsave("../figures/domain-specific-tightness.tiff", dpi = 350, height = 5)
 
 ```
 
